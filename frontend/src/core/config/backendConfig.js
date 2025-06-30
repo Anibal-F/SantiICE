@@ -21,7 +21,7 @@ export const BACKEND_CONFIG = {
       results: '/api/conciliator/results',
       download: '/api/conciliator/download'
     },
-    websocket: process.env.REACT_APP_CONCILIATOR_WS_URL || 'ws://localhost:8000/api/conciliator/ws',
+    websocket: process.env.REACT_APP_CONCILIATOR_WS_URL || 'ws://54.165.190.194/api/conciliator/ws',
     timeout: 60000
   },
   
