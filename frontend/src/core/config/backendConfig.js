@@ -1,7 +1,7 @@
 // Configuración de backends por módulo
 export const BACKEND_CONFIG = {
   tickets: {
-    baseUrl: process.env.REACT_APP_TICKETS_API_URL || 'http://localhost:8000',
+    baseUrl: process.env.REACT_APP_TICKETS_API_URL || '',
     endpoints: {
       upload: '/upload-tickets',
       process: '/process-tickets',
@@ -12,7 +12,7 @@ export const BACKEND_CONFIG = {
   },
   
   conciliator: {
-    baseUrl: process.env.REACT_APP_CONCILIATOR_API_URL || 'http://localhost:8000',
+    baseUrl: process.env.REACT_APP_CONCILIATOR_API_URL || '',
     endpoints: {
       clients: '/api/conciliator/clients',
       session: '/api/conciliator/session',
