@@ -1,0 +1,43 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: santiice-backend
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env.docker
+    environment:
+      - PYTHONPATH=/app
+      - FLASK_ENV=production
+    volumes:
+      - ./uploads:/app/uploads
+      - ./logs:/app/logs
+      - ./app/credentials:/app/credentials
+      - ./credentials.json:/app/credentials.json
+      - ./service_account.json:/app/service_account.json
+    restart: unless-stopped
+    networks:
+      - santiice-network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: santiice-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - santiice-network
+
+networks:
+  santiice-network:
+    driver: bridge
+
+volumes:
+  uploads:
+  logs:

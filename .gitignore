@@ -1,0 +1,57 @@
+# Archivos de credenciales - NUNCA subir a GitHub
+credentials.json
+service_account.json
+*.json
+.env
+.env.local
+.env.production
+.env.docker
+
+# Archivos de AWS
+.aws/
+aws-credentials.txt
+
+# Archivos temporales y logs
+*.log
+logs/
+temp/
+tmp/
+
+# Archivos de uploads (pueden contener datos sensibles)
+uploads/
+upload/
+
+# Dependencias de Node.js
+node_modules/
+npm-debug.log*
+
+# Archivos de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# IDEs
+.vscode/
+.idea/
+*.sublime-*
+
+# Docker
+.dockerignore
+
+# Certificados SSL
+*.pem
+*.key
+*.crt

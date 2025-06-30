@@ -1,0 +1,526 @@
+"""
+Extensión del Reconciler para KIOSKO con manejo específico de devoluciones
+Hereda del Reconciler base y agrega funcionalidades específicas
+"""
+
+import pandas as pd
+import numpy as np
+from typing import Dict, List, Tuple, Optional
+import logging
+from datetime import datetime
+
+# Importar el reconciler base MEJORADO
+try:
+    # Importar desde la raíz (donde está el reconciler.py mejorado)
+    import sys
+    from pathlib import Path
+    
+    # Agregar raíz del proyecto al path
+    project_root = Path(__file__).parent.parent.parent
+    sys.path.insert(0, str(project_root))
+    
+    from reconciler import Reconciler
+    from config import config
+    
+    logger = logging.getLogger(__name__)
+    logger.info("✅ Imports KIOSKO reconciler exitosos - usando reconciler base mejorado")
+    
+except ImportError as e:
+    # Fallback para desarrollo
+    logger = logging.getLogger(__name__)
+    logger.error(f"❌ Error importando reconciler base: {e}")
+    logger.info("💡 Asegúrese de que reconciler.py esté en la raíz del proyecto")
+    raise ImportError(f"No se pudo importar reconciler base mejorado: {e}")
+
+# VALIDACIÓN: Verificar que estamos usando el reconciler correcto
+def validate_base_reconciler():
+    """Valida que estamos usando el reconciler base mejorado"""
+    try:
+        # Verificar que tiene las mejoras multi-cliente
+        test_reconciler = Reconciler('KIOSKO')
+        
+        # Verificar que tiene configuración específica por cliente
+        if hasattr(test_reconciler, 'config') and 'KIOSKO' in str(test_reconciler.config):
+            logger.info("✅ Reconciler base mejorado detectado correctamente")
+            return True
+        else:
+            logger.warning("⚠️ Reconciler base puede ser versión antigua")
+            return False
+            
+    except Exception as e:
+        logger.error(f"❌ Error validando reconciler base: {e}")
+        return False
+
+# Ejecutar validación al importar
+_base_reconciler_valid = validate_base_reconciler()
+if not _base_reconciler_valid:
+    logger.warning("⚠️ Reconciler base puede no tener todas las mejoras multi-cliente")
+
+logger = logging.getLogger(__name__)
+
+class KioskoReconciler(Reconciler):
+    """Reconciler especializado para KIOSKO con manejo de devoluciones"""
+    
+    def __init__(self):
+            """Inicializa el reconciler KIOSKO especializado"""
+            # Llamar al constructor padre con tipo KIOSKO
+            super().__init__(client_type="KIOSKO")
+            
+            # Agregar propiedades específicas de KIOSKO
+            self.returns_data = None
+            self.specialized_mode = True
+            
+            logger.info("🎯 KioskoReconciler inicializado - Modo especializado con manejo de devoluciones")
+            logger.info(f"🔧 Configuración heredada: ±{self.config['tolerance_percentage']}% / ±${self.config['tolerance_absolute']}")
+        
+def reconcile(self, kiosko_df: pd.DataFrame, looker_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Realiza conciliación KIOSKO con manejo especial de devoluciones
+    🔧 INCLUYE FIX de mapeo de valores para reportes
+    
+    Args:
+        kiosko_df: DataFrame procesado de KIOSKO
+        looker_df: DataFrame procesado de Looker
+        
+    Returns:
+        DataFrame con resultados de conciliación incluyendo devoluciones
+    """
+    logger.info("🔄 INICIANDO CONCILIACIÓN KIOSKO CON MANEJO DE DEVOLUCIONES")
+    
+    # PASO EXTRA: Separar devoluciones de transacciones normales
+    logger.info("🔧 Separando devoluciones de transacciones normales...")
+    kiosko_normal, kiosko_returns = self._separate_returns(kiosko_df)
+    
+    # Guardar devoluciones para procesamiento posterior
+    self.returns_data = kiosko_returns
+    
+    if len(kiosko_returns) > 0:
+        logger.info(f"↩️ {len(kiosko_returns)} devoluciones separadas (serán agregadas como informativos)")
+    
+    # Usar el flujo base del reconciler padre con solo transacciones normales
+    logger.info("🔄 Ejecutando conciliación base con transacciones normales...")
+    base_results = super().reconcile(kiosko_normal, looker_df)
+    
+    # 🔧 NUEVO: Aplicar fix de mapeo de valores ANTES de agregar devoluciones
+    logger.info("🔧 Aplicando fix de mapeo de valores...")
+    base_results_fixed = self.fix_value_mapping_for_kiosko(base_results)
+    
+    # PASO EXTRA: Agregar devoluciones como registros informativos
+    logger.info("↩️ Agregando devoluciones como registros informativos...")
+    final_results = self._add_returns_as_informative(base_results_fixed, kiosko_returns)
+    
+    # 🔧 NUEVO: Aplicar fix final de mapeo (por si las devoluciones causaron problemas)
+    final_results = self.fix_value_mapping_for_kiosko(final_results)
+    
+    # Recalcular estadísticas incluyendo devoluciones
+    self.reconciliation_results = final_results
+    self._calculate_summary_stats_with_returns()
+    
+    # 🔧 VALIDACIÓN FINAL: Verificar que los valores están correctos
+    self._validate_final_values()
+    
+    logger.info(f"✅ Conciliación KIOSKO completada: {len(final_results)} registros (incluyendo {len(kiosko_returns)} devoluciones)")
+    return final_results
+
+def fix_value_mapping_for_kiosko(self, reconciliation_results: pd.DataFrame) -> pd.DataFrame:
+    """🔧 FIX CRÍTICO: Asegurar que valor_oxxo_clean tenga los valores correctos para KIOSKO"""
+    if len(reconciliation_results) == 0:
+        return reconciliation_results
+    
+    df_fixed = reconciliation_results.copy()
+    
+    # Si valor_oxxo_clean está vacío pero valor_source_clean tiene datos
+    if 'valor_source_clean' in df_fixed.columns and 'valor_oxxo_clean' in df_fixed.columns:
+        source_non_zero = (df_fixed['valor_source_clean'] != 0).sum()
+        oxxo_non_zero = (df_fixed['valor_oxxo_clean'] != 0).sum()
+        
+        logger.info(f"🔧 Fix mapeo valores: valor_source_clean={source_non_zero} vs valor_oxxo_clean={oxxo_non_zero}")
+        
+        if source_non_zero > oxxo_non_zero:
+            df_fixed['valor_oxxo_clean'] = df_fixed['valor_source_clean']
+            logger.info(f"✅ Mapeado valor_source_clean → valor_oxxo_clean para {source_non_zero} registros")
+    
+    # Crear valor_oxxo_clean si no existe
+    elif 'valor_source_clean' in df_fixed.columns and 'valor_oxxo_clean' not in df_fixed.columns:
+        df_fixed['valor_oxxo_clean'] = df_fixed['valor_source_clean']
+        logger.info(f"✅ Creado valor_oxxo_clean desde valor_source_clean")
+    
+    # Asegurar que no haya valores nulos
+    if 'valor_oxxo_clean' in df_fixed.columns:
+        df_fixed['valor_oxxo_clean'] = df_fixed['valor_oxxo_clean'].fillna(0)
+    
+    return df_fixed
+
+def _validate_final_values(self):
+    """🔧 NUEVA: Validación final de valores para detectar problemas"""
+    if self.reconciliation_results is None or len(self.reconciliation_results) == 0:
+        return
+    
+    df = self.reconciliation_results
+    
+    # Validar campos de valor
+    valor_fields = ['valor_oxxo_clean', 'valor_source_clean', 'valor_looker_clean']
+    for field in valor_fields:
+        if field in df.columns:
+            non_zero = (df[field] != 0).sum()
+            total_sum = df[field].sum()
+            logger.info(f"🔍 Validación {field}: {non_zero} registros ≠ 0, Total: ${total_sum:,.2f}")
+    
+    # Validar que valor_oxxo_clean tenga datos para KIOSKO
+    if 'valor_oxxo_clean' in df.columns:
+        oxxo_total = df['valor_oxxo_clean'].sum()
+        if oxxo_total == 0:
+            logger.error(f"🚨 CRÍTICO: valor_oxxo_clean = $0.00 - El reporte mostrará importes vacíos")
+        else:
+            logger.info(f"✅ valor_oxxo_clean validado: ${oxxo_total:,.2f}")
+    
+    # Validar registros normales vs devoluciones
+    normal_records = df[df.get('categoria', '') != 'RETURN_INFORMATIVE']
+    return_records = df[df.get('categoria', '') == 'RETURN_INFORMATIVE']
+    
+    if len(normal_records) > 0 and 'valor_oxxo_clean' in normal_records.columns:
+        normal_total = normal_records['valor_oxxo_clean'].sum()
+        logger.info(f"🛒 Transacciones normales: ${normal_total:,.2f}")
+    
+    if len(return_records) > 0 and 'valor_oxxo_clean' in return_records.columns:
+        return_total = return_records['valor_oxxo_clean'].sum()
+        logger.info(f"↩️ Devoluciones: ${return_total:,.2f}")
+
+    def _separate_returns(self, kiosko_df: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame]:
+        """
+        Separa transacciones normales de devoluciones
+        
+        Args:
+            kiosko_df: DataFrame completo de KIOSKO
+            
+        Returns:
+            Tupla (transacciones_normales, devoluciones)
+        """
+        if len(kiosko_df) == 0:
+            return pd.DataFrame(), pd.DataFrame()
+        
+        # Identificar devoluciones por múltiples criterios
+        returns_mask = pd.Series([False] * len(kiosko_df), index=kiosko_df.index)
+        
+        # Criterio 1: Campo is_return si existe
+        if 'is_return' in kiosko_df.columns:
+            returns_mask = returns_mask | (kiosko_df['is_return'] == True)
+        
+        # Criterio 2: Valores negativos en total_venta o valor
+        value_fields = ['total_venta', 'valor', 'costo_total', 'Costo Total']
+        for field in value_fields:
+            if field in kiosko_df.columns:
+                returns_mask = returns_mask | (pd.to_numeric(kiosko_df[field], errors='coerce') < 0)
+                break
+        
+        # Criterio 3: Prefijo en ID original
+        if 'original_id' in kiosko_df.columns:
+            returns_mask = returns_mask | kiosko_df['original_id'].astype(str).str.startswith('36_')
+        elif 'Ticket' in kiosko_df.columns:
+            returns_mask = returns_mask | kiosko_df['Ticket'].astype(str).str.startswith('36_')
+        
+        # Criterio 4: Campo transaction_type si existe
+        if 'transaction_type' in kiosko_df.columns:
+            returns_mask = returns_mask | (kiosko_df['transaction_type'] == 'RETURN')
+        
+        normal_mask = ~returns_mask
+        
+        kiosko_normal = kiosko_df[normal_mask].copy()
+        kiosko_returns = kiosko_df[returns_mask].copy()
+        
+        logger.info(f"✅ Separación completada:")
+        logger.info(f"   🛒 Transacciones normales: {len(kiosko_normal)}")
+        logger.info(f"   ↩️ Devoluciones: {len(kiosko_returns)}")
+        
+        # Mostrar ejemplos de devoluciones
+        if len(kiosko_returns) > 0:
+            logger.info("🔍 Ejemplos de devoluciones encontradas:")
+            for idx, (_, row) in enumerate(kiosko_returns.head(3).iterrows()):
+                original_id = row.get('original_id', row.get('Ticket', 'N/A'))
+                amount = row.get('total_venta', row.get('valor', 0))
+                logger.info(f"   {idx + 1}. ID: {original_id}, Monto: ${amount:,.2f}")
+        
+        return kiosko_normal, kiosko_returns
+    
+    def _add_returns_as_informative(self, base_results: pd.DataFrame, returns_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Agrega devoluciones como registros informativos al final de los resultados
+        
+        Args:
+            base_results: DataFrame con resultados de conciliación base
+            returns_df: DataFrame con devoluciones
+            
+        Returns:
+            DataFrame combinado con devoluciones como informativos
+        """
+        if len(returns_df) == 0:
+            logger.info("📝 No hay devoluciones para agregar")
+            return base_results
+        
+        logger.info(f"📝 Agregando {len(returns_df)} devoluciones como registros informativos...")
+        
+        # Preparar devoluciones como registros informativos
+        informative_returns = []
+        
+        for _, return_row in returns_df.iterrows():
+            info_record = {}
+            
+            # Campos básicos requeridos para compatibilidad
+            info_record['id_matching'] = pd.to_numeric(return_row.get('identificador_unico', return_row.get('id_matching', 0)), errors='coerce')
+            
+            # Campos de valor
+            return_amount = return_row.get('total_venta', return_row.get('valor', 0))
+            info_record['valor_oxxo_clean'] = return_amount  # Mantener nombre para compatibilidad
+            info_record['valor_looker_clean'] = 0  # Las devoluciones no existen en Looker
+            info_record['diferencia_valor'] = return_amount  # Toda la diferencia
+            info_record['diferencia_absoluta'] = abs(return_amount)
+            info_record['diferencia_porcentaje'] = 0  # No aplica división por cero
+            
+            # Metadata específica para devoluciones
+            info_record['match_type'] = 'RETURN'
+            info_record['match_confidence'] = 100
+            info_record['categoria'] = 'RETURN_INFORMATIVE'
+            info_record['descripcion_categoria'] = 'Devolución (Informativo)'
+            
+            # Preservar información original de la devolución
+            info_record['original_ticket'] = return_row.get('original_id', return_row.get('Ticket', ''))
+            info_record['return_prefix'] = return_row.get('return_prefix', '')
+            info_record['transaction_type'] = 'RETURN'
+            info_record['is_return'] = True
+            
+            # Campos adicionales si existen
+            additional_fields = ['descripcion_clean', 'producto_clean', 'fecha_clean']
+            for field in additional_fields:
+                if field in return_row:
+                    info_record[field] = return_row[field]
+            
+            # Copiar otros campos relevantes con sufijo
+            for col in returns_df.columns:
+                if col not in info_record and col not in ['id_matching']:
+                    info_record[f'{col}_kiosko'] = return_row[col]
+                    info_record[f'{col}_looker'] = np.nan
+            
+            informative_returns.append(info_record)
+        
+        # Convertir a DataFrame y combinar
+        if informative_returns:
+            returns_records_df = pd.DataFrame(informative_returns)
+            
+            # Asegurar que las columnas coincidan con base_results
+            for col in base_results.columns:
+                if col not in returns_records_df.columns:
+                    returns_records_df[col] = np.nan
+            
+            # Combinar preservando orden: transacciones normales primero, devoluciones al final
+            combined_df = pd.concat([base_results, returns_records_df], ignore_index=True, sort=False)
+            
+            logger.info(f"✅ Devoluciones agregadas como informativos: {len(returns_records_df)} registros")
+            logger.info(f"📊 Total final: {len(combined_df)} registros ({len(base_results)} normales + {len(returns_records_df)} devoluciones)")
+            
+            return combined_df
+        
+        return base_results
+    
+    def _calculate_summary_stats_with_returns(self):
+        """Calcula estadísticas resumen incluyendo manejo especial de devoluciones"""
+        if self.reconciliation_results is None or len(self.reconciliation_results) == 0:
+            self.summary_stats = {}
+            return
+        
+        df = self.reconciliation_results
+        
+        # Separar devoluciones de transacciones normales para estadísticas
+        returns_mask = df['categoria'] == 'RETURN_INFORMATIVE'
+        transaction_results = df[~returns_mask]
+        returns_results = df[returns_mask]
+        
+        # Conteo por categorías (excluyendo devoluciones del conteo principal)
+        category_counts = transaction_results['categoria'].value_counts().to_dict()
+        
+        # Estadísticas de diferencias (solo transacciones normales)
+        numeric_differences = transaction_results[
+            transaction_results['categoria'].isin(['WITHIN_TOLERANCE', 'MINOR_DIFFERENCE', 'MAJOR_DIFFERENCE'])
+        ]
+        
+        # Estadísticas base (como el padre) pero separando devoluciones
+        self.summary_stats = {
+            'total_records': len(transaction_results),  # Solo transacciones normales
+            'total_with_returns': len(df),  # Total incluyendo devoluciones
+            'exact_matches': category_counts.get('EXACT_MATCH', 0),
+            'within_tolerance': category_counts.get('WITHIN_TOLERANCE', 0),
+            'minor_differences': category_counts.get('MINOR_DIFFERENCE', 0),
+            'major_differences': category_counts.get('MAJOR_DIFFERENCE', 0),
+            'missing_in_oxxo': category_counts.get('MISSING_IN_KIOSKO', 0),  # Mantener nombre para compatibilidad
+            'missing_in_looker': category_counts.get('MISSING_IN_LOOKER', 0),
+            'total_valor_oxxo': transaction_results['valor_oxxo_clean'].sum(),  # Solo transacciones normales
+            'total_valor_looker': transaction_results['valor_looker_clean'].sum(),
+            'total_diferencia': transaction_results['diferencia_valor'].sum(),
+            'avg_diferencia_porcentaje': numeric_differences['diferencia_porcentaje'].mean() if len(numeric_differences) > 0 else 0,
+            'max_diferencia_abs': transaction_results['diferencia_absoluta'].max() if len(transaction_results) > 0 else 0,
+            'reconciliation_rate': (len(transaction_results) - category_counts.get('MISSING_IN_KIOSKO', 0) - category_counts.get('MISSING_IN_LOOKER', 0)) / len(transaction_results) * 100 if len(transaction_results) > 0 else 0,
+            'client_type': 'KIOSKO',
+            
+            # Estadísticas específicas de devoluciones
+            'returns_count': len(returns_results),
+            'returns_total_amount': returns_results['valor_oxxo_clean'].sum() if len(returns_results) > 0 else 0,
+            'returns_avg_amount': returns_results['valor_oxxo_clean'].mean() if len(returns_results) > 0 else 0,
+            'returns_included_as_informative': True,
+            'returns_excluded_from_reconciliation': True
+        }
+        
+        logger.info(f"📈 Estadísticas KIOSKO calculadas:")
+        logger.info(f"   📊 Transacciones normales: {self.summary_stats['total_records']}")
+        logger.info(f"   ↩️ Devoluciones (informativos): {self.summary_stats['returns_count']}")
+        logger.info(f"   📈 Tasa de conciliación: {self.summary_stats['reconciliation_rate']:.1f}%")
+        logger.info(f"   💰 Total devoluciones: ${self.summary_stats['returns_total_amount']:,.2f}")
+    
+    def get_billing_ready_records(self) -> pd.DataFrame:
+        """Obtiene registros listos para facturación (excluye devoluciones)"""
+        if self.reconciliation_results is None:
+            return pd.DataFrame()
+        
+        approved_categories = ['EXACT_MATCH', 'WITHIN_TOLERANCE']
+        
+        # Excluir devoluciones de registros para facturación
+        billing_records = self.reconciliation_results[
+            (self.reconciliation_results['categoria'].isin(approved_categories)) &
+            (self.reconciliation_results['categoria'] != 'RETURN_INFORMATIVE')
+        ]
+        
+        logger.info(f"💰 Registros KIOSKO listos para facturación: {len(billing_records)}")
+        return billing_records
+    
+    def get_returns_summary(self) -> Dict:
+        """Obtiene resumen detallado de devoluciones"""
+        if self.returns_data is None or len(self.returns_data) == 0:
+            return {
+                'count': 0,
+                'total_amount': 0,
+                'avg_amount': 0,
+                'examples': []
+            }
+        
+        # Encontrar campo de valor
+        value_field = None
+        for field in ['total_venta', 'valor', 'Costo Total']:
+            if field in self.returns_data.columns:
+                value_field = field
+                break
+        
+        if value_field:
+            amounts = pd.to_numeric(self.returns_data[value_field], errors='coerce').fillna(0)
+            examples = []
+            
+            for _, row in self.returns_data.head(5).iterrows():
+                examples.append({
+                    'ticket': row.get('original_id', row.get('Ticket', 'N/A')),
+                    'amount': float(row.get(value_field, 0)),
+                    'product': row.get('descripcion_clean', row.get('Descripción', 'N/A'))
+                })
+        else:
+            amounts = pd.Series([0])
+            examples = []
+        
+        return {
+            'count': len(self.returns_data),
+            'total_amount': float(amounts.sum()),
+            'avg_amount': float(amounts.mean()),
+            'min_amount': float(amounts.min()),
+            'max_amount': float(amounts.max()),
+            'examples': examples
+        }
+    
+    def get_normal_transactions_summary(self) -> Dict:
+        """Obtiene resumen de solo transacciones normales (sin devoluciones)"""
+        if self.reconciliation_results is None:
+            return {}
+        
+        # Filtrar solo transacciones normales
+        normal_transactions = self.reconciliation_results[
+            self.reconciliation_results['categoria'] != 'RETURN_INFORMATIVE'
+        ]
+        
+        if len(normal_transactions) == 0:
+            return {'count': 0}
+        
+        category_counts = normal_transactions['categoria'].value_counts().to_dict()
+        
+        return {
+            'count': len(normal_transactions),
+            'categories': category_counts,
+            'total_value': float(normal_transactions['valor_oxxo_clean'].sum()),
+            'reconciled_count': category_counts.get('EXACT_MATCH', 0) + category_counts.get('WITHIN_TOLERANCE', 0),
+            'reconciliation_rate': (category_counts.get('EXACT_MATCH', 0) + category_counts.get('WITHIN_TOLERANCE', 0)) / len(normal_transactions) * 100
+        }
+
+    def fix_value_mapping_for_kiosko(self, reconciliation_results: pd.DataFrame) -> pd.DataFrame:
+        """🔧 FIX CRÍTICO: Asegurar que valor_oxxo_clean tenga los valores correctos para KIOSKO"""
+        if len(reconciliation_results) == 0:
+            return reconciliation_results
+        
+        df_fixed = reconciliation_results.copy()
+        
+        # Si valor_source_clean existe, mapear a todas las variantes necesarias
+        if 'valor_source_clean' in df_fixed.columns:
+            source_total = df_fixed['valor_source_clean'].sum()
+            
+            # Crear valor_oxxo_clean si no existe o está vacío
+            if 'valor_oxxo_clean' not in df_fixed.columns or df_fixed['valor_oxxo_clean'].sum() == 0:
+                df_fixed['valor_oxxo_clean'] = df_fixed['valor_source_clean']
+                logger.info(f"✅ KIOSKO Fix: Mapeado valor_source_clean → valor_oxxo_clean (${source_total:,.2f})")
+            
+            # Crear valor_kiosko_clean específicamente para KIOSKO
+            df_fixed['valor_kiosko_clean'] = df_fixed['valor_source_clean']
+            logger.info(f"✅ KIOSKO Fix: Creado valor_kiosko_clean (${source_total:,.2f})")
+        
+        return df_fixed
+
+# Función factory para crear reconciler KIOSKO
+def create_kiosko_reconciler():
+    """Crea un reconciler especializado para KIOSKO"""
+    return KioskoReconciler()
+
+# Test function
+def test_kiosko_reconciler():
+    """Función de prueba para el reconciler KIOSKO"""
+    print("🧪 TESTING RECONCILER KIOSKO ESPECIALIZADO")
+    print("=" * 50)
+    
+    # Crear datos de prueba con devoluciones
+    kiosko_test = pd.DataFrame({
+        'identificador_unico': ['41561357', '41101526', '36_41681627'],  # 2 normales, 1 devolución
+        'total_venta': [1500, 980, -450],  # Devolución negativa
+        'is_return': [False, False, True],
+        'original_id': ['4156-1-3-357', '4110-1-3-526', '36_4168-1-6-27'],
+        'transaction_type': ['NORMAL', 'NORMAL', 'RETURN']
+    })
+    
+    looker_test = pd.DataFrame({
+        'identificador_unico': ['41561357', '41101526'],  # Solo los normales
+        'total_venta': [1500, 980]
+    })
+    
+    # Probar reconciler
+    reconciler = KioskoReconciler()
+    results = reconciler.reconcile(kiosko_test, looker_test)
+    
+    print(f"✅ Reconciliación KIOSKO test completada: {len(results)} registros")
+    
+    # Estadísticas
+    categories = results['categoria'].value_counts()
+    print(f"📊 Categorías encontradas:")
+    for cat, count in categories.items():
+        print(f"   {cat}: {count}")
+    
+    # Resumen de devoluciones
+    returns_summary = reconciler.get_returns_summary()
+    print(f"↩️ Devoluciones: {returns_summary['count']} (Total: ${returns_summary['total_amount']:,.2f})")
+    
+    # Registros listos para facturación
+    billing_ready = reconciler.get_billing_ready_records()
+    print(f"💰 Listos para facturación: {len(billing_ready)} registros")
+    
+    return True
+
+if __name__ == "__main__":
+    test_kiosko_reconciler()
