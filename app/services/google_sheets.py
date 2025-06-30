@@ -478,14 +478,14 @@ def get_google_credentials():
         except Exception as e:
             print(f"❌ Error obteniendo credenciales desde Secrets Manager: {e}")
             # Si falla, intentar con el archivo local en la carpeta de credenciales
-            local_creds_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials', 'credentials.json')
+            local_creds_path = '/app/credentials/credentials.json'
             if os.path.exists(local_creds_path):
                 print(f"⚠️ Usando credenciales locales como fallback en: {local_creds_path}")
                 return local_creds_path
             raise Exception(f"No se pudieron obtener las credenciales de Google: {e}")
     else:
         # En desarrollo local, usar el archivo de credenciales
-        local_creds_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'credentials', 'credentials.json')
+        local_creds_path = '/app/credentials/credentials.json'
         if not os.path.exists(local_creds_path):
             raise Exception(f"Archivo de credenciales no encontrado en: {local_creds_path}")
         
