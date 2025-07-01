@@ -403,8 +403,34 @@ def process_kiosko_tickets(data, all_values, headers, sheet, precios_config=None
                 else:
                     cantidad = 0
             
-            # Usar el precio que viene del frontend (campo 'costo')
-            precio_unitario = item.get("costo", 16.0)  # Usar el costo enviado desde el frontend
+            # Determinar el tipo de producto y obtener precio configurado
+            sucursal_nombre = item.get("nombreTienda", "")
+            
+            # Determinar tipo de producto
+            if "tipoProducto" in item and item["tipoProducto"]:
+                if "5kg" in item["tipoProducto"].lower():
+                    tipo_producto = "5kg"
+                elif "15kg" in item["tipoProducto"].lower():
+                    tipo_producto = "15kg"
+                else:
+                    tipo_producto = "5kg"  # Default
+            elif "descripcion" in item and item["descripcion"]:
+                if "5" in item["descripcion"] and "15" not in item["descripcion"]:
+                    tipo_producto = "5kg"
+                elif "15" in item["descripcion"]:
+                    tipo_producto = "15kg"
+                else:
+                    tipo_producto = "5kg"  # Default
+            else:
+                tipo_producto = "5kg"  # Default
+            
+            # Obtener precio configurado por sucursal o usar default
+            if precios_config and "KIOSKO" in precios_config and sucursal_nombre in precios_config["KIOSKO"]:
+                precio_unitario = precios_config["KIOSKO"][sucursal_nombre].get(tipo_producto, 
+                    45.0 if tipo_producto == "15kg" else 16.0)
+            else:
+                # Precios por defecto para KIOSKO
+                precio_unitario = 45.0 if tipo_producto == "15kg" else 16.0
             
             total_venta = precio_unitario * cantidad
             

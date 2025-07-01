@@ -655,7 +655,7 @@ async def upload_image(file: UploadFile = File(...)):
         if sucursal == "OXXO" and len(processed_data) > 1:
             # Primero verificamos si alguno de los productos ya está registrado
             first_product = processed_data[0]
-            verify_response = send_to_google_sheets(sucursal, [first_product], origen="extracción")
+            verify_response = send_to_google_sheets(sucursal, [first_product], precios_config=None, origen="extracción")
             
             # Si el primer producto está duplicado, asumimos que todo el ticket está duplicado
             if verify_response.get("duplicated", False):
@@ -673,7 +673,7 @@ async def upload_image(file: UploadFile = File(...)):
                 )
         
         # Si no hay duplicados, procedemos a guardar todos los productos
-        google_sheets_response = send_to_google_sheets(sucursal, processed_data, origen="extracción")
+        google_sheets_response = send_to_google_sheets(sucursal, processed_data, precios_config=None, origen="extracción")
         
         # Verificar si se detectó un duplicado y rechazar la solicitud
         if google_sheets_response.get("duplicated", False):
@@ -1039,7 +1039,7 @@ async def process_uploaded_file(request: Request):
         if sucursal == "OXXO" and len(processed_data) > 1:
             # Primero verificamos si alguno de los productos ya está registrado
             first_product = processed_data[0]
-            verify_response = send_to_google_sheets(sucursal, [first_product], origen="extracción")
+            verify_response = send_to_google_sheets(sucursal, [first_product], precios_config=None, origen="extracción")
             
             # Si el primer producto está duplicado, asumimos que todo el ticket está duplicado
             if verify_response.get("duplicated", False):
@@ -1057,7 +1057,7 @@ async def process_uploaded_file(request: Request):
                 )
         
         # Si no hay duplicados, procedemos a guardar todos los productos
-        google_sheets_response = send_to_google_sheets(sucursal, processed_data, origen="extracción")
+        google_sheets_response = send_to_google_sheets(sucursal, processed_data, precios_config=None, origen="extracción")
         
         # Verificar si se detectó un duplicado y rechazar la solicitud
         if google_sheets_response.get("duplicated", False):
