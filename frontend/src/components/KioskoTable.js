@@ -155,10 +155,10 @@ const KioskoTable = ({
             }`}>
               Productos
             </th>
-            <th className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wider w-24 ${
+            <th className={`px-3 py-3 text-left text-xs font-medium uppercase tracking-wider w-32 ${
               config.darkMode ? 'text-white' : 'text-gray-500'
             }`}>
-              Confianza
+              Precios
             </th>
             <th className={`px-2 py-3 text-center text-xs font-medium uppercase tracking-wider w-12 ${
               config.darkMode ? 'text-white' : 'text-gray-500'
@@ -264,22 +264,60 @@ const KioskoTable = ({
                 </div>
               </td>
               <td className="px-3 py-4 whitespace-nowrap">
-                <ConfidenceIndicator confidence={ticket.confidence} />
+                <div className="space-y-1">
+                  {ticket.productos.map((producto, index) => {
+                    const tipoProducto = producto.tipoProducto || '';
+                    let precioDefault = 16.0;
+                    
+                    if (tipoProducto.includes('15kg') || tipoProducto.includes('15 kg')) {
+                      precioDefault = 45.0;
+                    } else if (tipoProducto.includes('5kg') || tipoProducto.includes('5 kg')) {
+                      precioDefault = 16.0;
+                    }
+                    
+                    const precio = producto.importeUnitario || precioDefault;
+                    
+                    return (
+                      <div key={index} className="flex items-center space-x-1">
+                        <span className="text-xs text-gray-500">
+                          {tipoProducto.includes('15') ? '15kg' : '5kg'}:
+                        </span>
+                        <input
+                          type="number"
+                          step="0.1"
+                          value={precio}
+                          onChange={(e) => {
+                            const updatedProducts = [...ticket.productos];
+                            updatedProducts[index] = { ...updatedProducts[index], importeUnitario: parseFloat(e.target.value) || 0 };
+                            onUpdateTicket(ticket.id, 'productos', updatedProducts);
+                          }}
+                          className={`w-16 px-1 py-0.5 text-xs border rounded ${
+                            config.darkMode 
+                              ? 'bg-gray-700 border-gray-600 text-white' 
+                              : 'bg-white border-gray-300'
+                          }`}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
               </td>
-              <td className="px-2 py-4 whitespace-nowrap text-center">
-                <button
-                  onClick={() => onDeleteTicket && onDeleteTicket(ticket.id)}
-                  className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
-                    config.darkMode 
-                      ? 'text-red-400 hover:bg-red-900' 
-                      : 'text-red-600 hover:bg-red-100'
-                  }`}
-                  title="Eliminar ticket"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
+              <td className="px-2 py-4 whitespace-nowrap">
+                <div className="flex justify-center">
+                  <button
+                    onClick={() => onDeleteTicket && onDeleteTicket(ticket.id)}
+                    className={`flex items-center justify-center w-8 h-8 rounded transition-colors ${
+                      config.darkMode 
+                        ? 'text-red-400 hover:bg-red-900' 
+                        : 'text-red-600 hover:bg-red-100'
+                    }`}
+                    title="Eliminar ticket"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </div>
               </td>
             </tr>
           ))}
