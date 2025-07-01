@@ -423,23 +423,15 @@ def process_kiosko_tickets(data, all_values, headers, sheet, precios_config=None
             else:
                 tipo_producto = "5kg"
             
-            # Prioridad 1: Precios del catálogo por sucursal
-            if precios_config and "KIOSKO" in precios_config and sucursal_nombre in precios_config["KIOSKO"]:
-                precio_unitario = precios_config["KIOSKO"][sucursal_nombre].get(tipo_producto)
-                if precio_unitario:
-                    precio_unitario = float(precio_unitario)
-                else:
-                    precio_unitario = None
+            # Precios por defecto con excepciones específicas
+            sucursales_44_pesos = ["Occidental", "Solidaridad", "Miguel Hidalgo", "Francisco Perez"]
+            
+            if tipo_producto == "15kg" and sucursal_nombre in sucursales_44_pesos:
+                precio_unitario = 44.0
+            elif tipo_producto == "15kg":
+                precio_unitario = 45.0
             else:
-                precio_unitario = None
-            
-            # Prioridad 2: Precio del OCR
-            if not precio_unitario and "importeUnitario" in item and item["importeUnitario"]:
-                precio_unitario = float(item["importeUnitario"])
-            
-            # Prioridad 3: Precios por defecto
-            if not precio_unitario:
-                precio_unitario = 45.0 if tipo_producto == "15kg" else 16.0
+                precio_unitario = 16.0
             
             total_venta = precio_unitario * cantidad
             
