@@ -292,7 +292,7 @@ const OxxoTable = ({
                     
                     return (
                       <div key={index} className="flex items-center space-x-1">
-                        <span className="text-xs text-gray-500">${tipo}:</span>
+                        <span className="text-xs text-gray-500">{tipo}:</span>
                         <input
                           type="number"
                           step="0.1"
