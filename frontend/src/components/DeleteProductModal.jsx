@@ -19,14 +19,23 @@ const DeleteProductModal = ({ isOpen, onClose, onDelete, products, ticketType })
         
         <div className="space-y-2 max-h-60 overflow-y-auto">
           {products.map((product, index) => {
-            // Determinar qué mostrar según el tipo de ticket
-            const displayName = ticketType === 'OXXO' 
-              ? product.descripcion 
-              : product.tipoProducto;
-              
-            const quantity = ticketType === 'OXXO'
-              ? product.cantidad
-              : product.numeroPiezasCompradas;
+            // Determinar qué mostrar según el tipo de ticket y estructura del producto
+            let displayName, quantity;
+            
+            // Para tickets manuales (tienen 'nombre')
+            if (product.nombre) {
+              displayName = product.nombre;
+              quantity = product.cantidad;
+            } else {
+              // Para tickets OCR (estructura original)
+              displayName = ticketType === 'OXXO' 
+                ? product.descripcion 
+                : product.tipoProducto;
+                
+              quantity = ticketType === 'OXXO'
+                ? product.cantidad
+                : product.numeroPiezasCompradas;
+            }
             
             return (
               <button
