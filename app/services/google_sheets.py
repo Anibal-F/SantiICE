@@ -426,12 +426,19 @@ def process_kiosko_tickets(data, all_values, headers, sheet, precios_config=None
             # Precios por defecto con excepciones específicas
             sucursales_44_pesos = ["Occidental", "Solidaridad", "Miguel Hidalgo", "Francisco Perez"]
             
+            print(f"🔍 Debug precios - Sucursal: '{sucursal_nombre}', Tipo: '{tipo_producto}'")
+            print(f"🔍 Sucursales $44: {sucursales_44_pesos}")
+            print(f"🔍 ¿Está en lista?: {sucursal_nombre in sucursales_44_pesos}")
+            
             if tipo_producto == "15kg" and sucursal_nombre in sucursales_44_pesos:
                 precio_unitario = 44.0
+                print(f"💰 Aplicando precio especial $44 para {sucursal_nombre}")
             elif tipo_producto == "15kg":
                 precio_unitario = 45.0
+                print(f"💰 Aplicando precio normal $45 para 15kg")
             else:
                 precio_unitario = 16.0
+                print(f"💰 Aplicando precio $16 para 5kg")
             
             total_venta = precio_unitario * cantidad
             

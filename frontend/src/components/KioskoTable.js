@@ -267,10 +267,13 @@ const KioskoTable = ({
                 <div className="space-y-1">
                   {ticket.productos.map((producto, index) => {
                     const tipoProducto = producto.tipoProducto || '';
+                    const sucursalNombre = ticket.sucursal || '';
+                    const sucursales44Pesos = ['Occidental', 'Solidaridad', 'Miguel Hidalgo', 'Francisco Perez'];
+                    
                     let precioDefault = 16.0;
                     
                     if (tipoProducto.includes('15kg') || tipoProducto.includes('15 kg')) {
-                      precioDefault = 45.0;
+                      precioDefault = sucursales44Pesos.includes(sucursalNombre) ? 44.0 : 45.0;
                     } else if (tipoProducto.includes('5kg') || tipoProducto.includes('5 kg')) {
                       precioDefault = 16.0;
                     }
