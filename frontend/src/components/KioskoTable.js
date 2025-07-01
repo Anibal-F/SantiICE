@@ -278,7 +278,7 @@ const KioskoTable = ({
                       precioDefault = 16.0;
                     }
                     
-                    const precio = producto.importeUnitario || precioDefault;
+                    const precio = precioDefault; // Usar siempre precios por defecto
                     
                     return (
                       <div key={index} className="flex items-center space-x-1">
