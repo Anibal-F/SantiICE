@@ -247,7 +247,7 @@ const OxxoTable = ({
                     {/* Botón eliminar producto */}
                     {ticket.productos.length > 1 && onDeleteProduct && (
                       <button
-                        onClick={() => onDeleteProduct(ticket.id, ticket.productos, 'OXXO')}
+                        onClick={() => onDeleteProduct(ticket.id)}
                         className={`flex items-center justify-center w-6 h-6 transition-colors ${
                           config.darkMode 
                             ? 'text-orange-400 hover:text-orange-300' 

@@ -50,7 +50,7 @@ const AppContent = () => {
     addProductToTicket,
     updateQuantity,
     deleteTicket,
-    deleteProductFromTicket,
+    deleteProduct: deleteProductFromTicket,
     resetProcess
   } = useTicketProcessing();
   

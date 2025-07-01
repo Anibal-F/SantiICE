@@ -33,7 +33,8 @@ const DeleteProductModal = ({ isOpen, onClose, onDelete, products, ticketType })
                 key={index}
                 onClick={() => {
                   onDelete(index);
-                  onClose();
+                  // Cerrar el modal después de un pequeño delay para asegurar que se procese la eliminación
+                  setTimeout(() => onClose(), 100);
                 }}
                 className={`w-full text-left p-3 rounded-md flex items-center justify-between ${
                   config.darkMode 
