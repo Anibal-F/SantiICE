@@ -89,12 +89,15 @@ const OxxoTable = ({
       const esSingular = cantidad === 1;
       
       let tipo = '';
-      if (producto.descripcion?.includes('5K') || producto.descripcion?.includes('5kg')) {
-        tipo = 'Bolsas de 5kg: ';
-      } else if (producto.descripcion?.includes('15KG') || producto.descripcion?.includes('15kg')) {
+      const descripcion = producto.descripcion || '';
+      
+      // Verificar primero 15kg para evitar conflictos con 5kg
+      if (descripcion.includes('15KG') || descripcion.includes('15kg') || descripcion.includes('15 kg')) {
         tipo = 'Bolsas de 15kg: ';
+      } else if (descripcion.includes('5K') || descripcion.includes('5kg') || descripcion.includes('5 kg')) {
+        tipo = 'Bolsas de 5kg: ';
       } else {
-        tipo = `${producto.descripcion}: `;
+        tipo = `${descripcion}: `;
       }
       
       return (
