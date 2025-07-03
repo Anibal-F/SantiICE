@@ -243,7 +243,6 @@ def extract_sucursal_info(ocr_text):
         for variacion in variaciones:
             if variacion in texto_upper:
                 # Verificar que no sea parte de otra palabra
-                import re
                 patron = r'\b' + re.escape(variacion) + r'\b'
                 if re.search(patron, texto_upper):
                     nombre_sucursal = nombre_completo

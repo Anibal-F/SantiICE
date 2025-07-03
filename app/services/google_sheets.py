@@ -407,17 +407,17 @@ def process_kiosko_tickets(data, all_values, headers, sheet, precios_config=None
             sucursal_nombre = item.get("nombreTienda", "")
             
             if "tipoProducto" in item and item["tipoProducto"]:
-                if "5kg" in item["tipoProducto"].lower():
-                    tipo_producto = "5kg"
-                elif "15kg" in item["tipoProducto"].lower():
+                if "15kg" in item["tipoProducto"].lower() or "15 kg" in item["tipoProducto"].lower():
                     tipo_producto = "15kg"
+                elif "5kg" in item["tipoProducto"].lower() or "5 kg" in item["tipoProducto"].lower():
+                    tipo_producto = "5kg"
                 else:
                     tipo_producto = "5kg"
             elif "descripcion" in item and item["descripcion"]:
-                if "5" in item["descripcion"] and "15" not in item["descripcion"]:
-                    tipo_producto = "5kg"
-                elif "15" in item["descripcion"]:
+                if "15" in item["descripcion"]:
                     tipo_producto = "15kg"
+                elif "5" in item["descripcion"]:
+                    tipo_producto = "5kg"
                 else:
                     tipo_producto = "5kg"
             else:
@@ -519,11 +519,19 @@ def get_google_credentials():
             raise Exception(f"No se pudieron obtener las credenciales de Google: {e}")
     else:
         # En desarrollo local, usar el archivo de credenciales
-        local_creds_path = '/app/credentials/credentials.json'
-        if not os.path.exists(local_creds_path):
-            raise Exception(f"Archivo de credenciales no encontrado en: {local_creds_path}")
+        possible_paths = [
+            '/app/credentials/credentials.json',
+            '/Users/analistadesoporte/SantiICE-OCR/service_account.json',
+            'service_account.json',
+            '../service_account.json'
+        ]
         
-        return local_creds_path
+        for path in possible_paths:
+            if os.path.exists(path):
+                print(f"🔐 Usando credenciales desde: {path}")
+                return path
+        
+        raise Exception(f"Archivo de credenciales no encontrado en ninguna de las rutas: {possible_paths}")
 
 def get_credentials_path():
     """Retorna la ruta al archivo de credenciales según el entorno"""
